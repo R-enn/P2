@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
                         unsigned bytes = MIN_MACRO(UDP_MAX_DATA, req.data.GetSize());
 
                         // Create the payload of the packet. We need to create a packet to
-                        // send back to the source.
+                        // send back to the source. We push the data into the packet first.
                         Packet p(req.data.ExtractFront(bytes));
 
                         // Make the IP header first since we need it to do the udp checksum

@@ -73,62 +73,67 @@ int main(int argc, char * argv[]) {
             if (event.handle == mux) {
 
                 Packet p;
-                unsigned short len, header_len;
+                unsigned short header_len, len;
                 unsigned int ack, seq_num;
-                unsigned char flags;
+                unsigned char flags, len;
                 bool checksumok;
 
                 // Recieves TCP packet from the IP_MUX and obtains information.
                 MinetReceive(mux, p);
 
-                // Prints out the packet using the Minet IP. Messy af.
+                // Prints out the packet using the Minet IP.
                 cout << "\n\n" << p.Print(cout);
 
-                // Extracts the headers (given the estimate).
+                // Extracts the headers (given the estimate). Technically, we should be calculating this
+                // ourselves. Something to do with a number times 4.
                 header_len = TCPHeader::EstimateTCPHeaderLength(p);
                 p.ExtractHeaderFromPayload<TCPHeader>(header_len);
 
                 // Extracts the TCP header and performs a checksum.
-                TCPHeader tcph;
-                tcph = p.FindHeader(Headers::TCPHeader);
-                checksumok = tcph.IsCorrectChecksum(p);
+                TCPHeader tcph_rem;
+                tcph_rem = p.FindHeader(Headers::TCPHeader);
+                checksumok = tcph_rem.IsCorrectChecksum(p);
                 
                 // Extracts the IP header. This holds the source and destination address.
-                IPHeader iph;
-                iph = p.FindHeader(Headers::IPHeader);
+                IPHeader iph_rem;
+                iph_rem = p.FindHeader(Headers::IPHeader);
 
-                // Sets up the connection so that we can check it in our list.
+                // Sets up the connection so that we can check it in our list. This connection can be new.
+                // But we're going to use it to make sure that the packet is supposed to be sent to us.
+                // (Destination IP and Port point to this machine)
                 Connection c;
-                iph.GetDestIP(c.src);
-                iph.GetSourceIP(c.dest);
-                iph.GetProtocol(c.protocol);
-                tcph.GetDestPort(c.srcport);
-                tcph.GetSourcePort(c.destport);
+                iph_rem.GetDestIP(c.src);
+                iph_rem.GetSourceIP(c.dest);
+                iph_rem.GetProtocol(c.protocol);
+                tcph_rem.GetDestPort(c.srcport);
+                tcph_rem.GetSourcePort(c.destport);
 
-                // Finds if we have a connection with them. Not caring about data.
+                // Finds if we have an existing connection with them, or if they want to open up a 
+                // connection. We're assuming hand shake, so no data right now.
                 ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
                 if ( cs != clist.end() ) {
 
-                    // Obtains the flags from the TCPheader.
-                    tcph.GetAckNum(ack);
-                    tcph.GetSeqNum(seq_num);
-                    tcph.GetFlags(flags);
+                    // DEBUG:
+                    cout << "\n\nWe recognize this connection!\n";
+                    cout << (*cs).connection.Print(cout) << "\n";
 
+                    // Obtains the flags from the remote TCPheader.
+                    tcph_rem.GetAckNum(ack_rem);
+                    tcph_rem.GetSeqNum(seqnum_rem);
+                    tcph_rem.GetFlags(flags_rem);
+
+                    // DEBUG: Prints out our remote TCPheader.
+                    cout << "\n\nRemote TCP Header\n";
+                    cout << tcph_rem.Print(cout);
+                    
                     // SET FLAGS based on packet.
                     // Received a SYN from remote. Sends SYN+ACK back as Server.
                     if ( IS_SYN(flags) ) {
 
-                        cout << "\n\nWants to connect. Recieved SYN segment from remote.\n";
-                        cout << "Setting up a new TCP state with the SYN_SENT flag " << eState::SYN_SENT << "\n";
-                        (*cs).state.SetState( eState::SYN_SENT );
+                        // DEBUG:
+                        cout << "\n\nRecieved SYN flag from remote. It wants to connect.\n";
 
-                        // Creates and sends back packet.
-                        Packet sp;
-
-                        // Makes the IPHeader.
-                        IPHeader ih;
-                        ih.SetProtocol(IP_PROTO_TCP);
-                        ih.SetSourceIP((*cs).connection.
+                        // Creates packet to send out.
 
                     }
 
@@ -172,24 +177,22 @@ int main(int argc, char * argv[]) {
                         repl.type = STATUS;
                         repl.error = EOK;
 
-                        // Determines how much data we're sending in our buffer; Uh, technically this is
-                        // our recieve window.
-                        unsigned bytes = MIN_MACRO(TCP_MAX_DATA, req.data.GetSize());
+                        // Starts the passive open. Creating a new connection and state that is
+                        // in LISTEN mode.
+                        Connection c;
+                        c = repl.connection;
                         
-                        // Constructs new TCPState. In this case, we're the client starting starting the
-                        // Connection by sending out a packet with an ACK.
-                        Packet p(req.data.ExtractFront(bytes));
+                        cout << "\n\nPrinting out Connection in CONNECT request.\n\n";
+                        cout << c.Print(cout) << "\n";
 
-                        IPHeader ih;
-                        ih.SetProtocol(IP_PROTO_TCP);
-                        ih.SetSourceIP(req.connection.src);
-                        ih.SetDestIP(req.connection.dest);
-                        ih.SetTotalLength(bytes
+                        // Constructs new TCPState
 
                         MinetSend(sock,repl);
                     }
 
-                    // Passive open. We set up our "socket" and set our TCPState to listen.
+                    // Passive open. We set up our "socket" and set our TCPState to listen. Technically, this
+                    // state is always supposed to LISTEN? The socket is always listening, but we create a NEW
+                    // connection mapping when we recieve a SYN packet from remote client. 
                     case ACCEPT:
                     {
                         ConnectionToStateMapping<TCPState> m;
@@ -230,6 +233,7 @@ int main(int argc, char * argv[]) {
                     case WRITE:
                     {
                         // TODO: Write stuff.
+                        cout << "\n\nWe're in Write for socket.\n\n";
                     }
                     break;
 
