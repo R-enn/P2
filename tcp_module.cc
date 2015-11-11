@@ -169,29 +169,46 @@ int main(int argc, char * argv[]) {
                 // Types: CONNECT=0, ACCEPT=1, WRITE=2, FORWARD=3, CLOSE=4, STATUS=5 
                 switch (req.type) {
 
-                    // Active open from remote. The connection should be fully bound. The data, 
-                    // byte count, and error code fields are ignored. The TCP module will begin
-                    // the active open and immediately return a STATUS with the same connection
-                    // no data, no byte count, and the error code.
+		            // Client attempts to actively connect. Sends a SYN packet over and transitions
+                    // into the SYN-SENT state. This TCP packet has NO application data in it, just
+                    // the header flags to start off the three-way-handshake.
                     case CONNECT:
-                    {
+                    {   
+                        // Initializes our mapping and TCPState.
+                        ConnectionToStateMapping<TCPState> m;
+                        m.connection = req.connection;
+                        m.state.SetState(CLOSED);
+
+                        // Create our IPHeader.
+
+                        // Initializes a sequence number.
+    
+                        // Grabs our TCP_BUFFER or recvwnd. It should be initilialized in the tcpstate
+                        // constructor. There appears to be 100 maximum packets. Buffer allocated by
+                        // 100 * TCP_SEGEMENT_SIZE. View: libminet > tcpstate.cc
+    
+                        // Creates new TCPHeader. 
+    
+                        // Sets our SYN flag, Sequence Number, Recvwind Size. You can find functions for
+                        // this in the tcp.h libminet file.
+    
+
+                        // Sends out packet.
+                        MinetSend(mux, p); 
+
+                        // Updates our TCPState to eState(SYN_SENT), LastSend(seq_num). You might want to print this out to double
+                        // check the connection.
+    
+
+                        // There might be more to this. I just can't think of it right now.
+
+                        // Propogates response up to Socket.
                         SockRequestResponse repl;
                         repl.type = STATUS;
                         repl.error = EOK;
-
-                        // Starts the passive open. Creating a new connection and state that is
-                        // in LISTEN mode.
-                        Connection c;
-                        c = repl.connection;
-                        
-                        cout << "\n\nPrinting out Connection in CONNECT request.\n\n";
-                        cout << c.Print(cout) << "\n";
-
-                        // Constructs new TCPState
-
                         MinetSend(sock,repl);
                     }
-
+			
                     // Passive open. We set up our "socket" and set our TCPState to listen.
                     case ACCEPT:
                     {
