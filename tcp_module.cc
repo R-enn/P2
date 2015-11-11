@@ -105,29 +105,14 @@ int main(int argc, char * argv[]) {
                 tcph.GetDestPort(c.srcport);
                 tcph.GetSourcePort(c.destport);
 
-                // Finds if we have a connection with them.
+                // Finds if we have a connection with them. Not caring about data.
                 ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
                 if ( cs != clist.end() ) {
-
-                    // Obtains the mapped state.
-                    cout << "\n\nWe recognize this connection!\n";
-                    cout << cs.Print(cout) << "\n";
-
-                    // Calculates and extracts the data.
-                    tcph.GetHeaderLength(len);
-                    Buffer &data = p.GetPayLoad().ExtractBack(len);
-
-                    // DEBUG:
-                    cout << "\n\nChecks data that' we're sending.\n";
-                    cout << data << "\n";
 
                     // Obtains the flags from the TCPheader.
                     tcph.GetAckNum(ack);
                     tcph.GetSeqNum(seq_num);
                     tcph.GetFlags(flags);
-
-                    // Creates a socket response.
-                    SocketRequestResponse write(WRITE, (*cs).connection, data, len, EOK);
 
                     // SET FLAGS based on packet.
                     // Received a SYN from remote. Sends SYN+ACK back as Server.
@@ -135,7 +120,15 @@ int main(int argc, char * argv[]) {
 
                         cout << "\n\nWants to connect. Recieved SYN segment from remote.\n";
                         cout << "Setting up a new TCP state with the SYN_SENT flag " << eState::SYN_SENT << "\n";
-                        cs.state.SetState( eState::SYN_SENT );
+                        (*cs).state.SetState( eState::SYN_SENT );
+
+                        // Creates and sends back packet.
+                        Packet sp;
+
+                        // Makes the IPHeader.
+                        IPHeader ih;
+                        ih.SetProtocol(IP_PROTO_TCP);
+                        ih.SetSourceIP((*cs).connection.
 
                     }
 
@@ -179,15 +172,19 @@ int main(int argc, char * argv[]) {
                         repl.type = STATUS;
                         repl.error = EOK;
 
-                        // Starts the passive open. Creating a new connection and state that is
-                        // in LISTEN mode.
-                        Connection c;
-                        c = repl.connection;
+                        // Determines how much data we're sending in our buffer; Uh, technically this is
+                        // our recieve window.
+                        unsigned bytes = MIN_MACRO(TCP_MAX_DATA, req.data.GetSize());
                         
-                        cout << "\n\nPrinting out Connection in CONNECT request.\n\n";
-                        cout << c.Print(cout) << "\n";
+                        // Constructs new TCPState. In this case, we're the client starting starting the
+                        // Connection by sending out a packet with an ACK.
+                        Packet p(req.data.ExtractFront(bytes));
 
-                        // Constructs new TCPState
+                        IPHeader ih;
+                        ih.SetProtocol(IP_PROTO_TCP);
+                        ih.SetSourceIP(req.connection.src);
+                        ih.SetDestIP(req.connection.dest);
+                        ih.SetTotalLength(bytes
 
                         MinetSend(sock,repl);
                     }
