@@ -29,6 +29,42 @@
 
 using namespace std;
 
+int WriteTCPToIP(int ack, int seq, short windowsize) {
+	// create packet using max size (header + data???)
+	unsigned bytes = MIN_MACRO(TCP_MAXIMUM_SEGMENT_SIZE, req.data.GetSize());
+					
+	// add all of the data to a packet
+	Packet p(req.data.ExtractFront(bytes));
+				
+	// we are writing tcp to ip, so set IP headers first to encapsulate in a datagram
+	IPHeader ih;
+	ih.SetProtocol(IP_PROTO_TCP);
+	ih.SetSourceIP(req.connection.src);
+	ih.SetDestIP(req.connection.dest);
+	// or set max header size here????????? wtf 
+	ih.SetTotalLength(bytes+TCP_HEADER_MAX_LENGTH);
+					
+	// push header onto packet
+	p.PushFrontHeader(ih);
+				
+	// build tcp header
+	TCPHeader th;
+	th.SetSourcePort(req.connection.srcport, p);
+	th.SetDestPort(req.connection.destport, p);
+	th.SetSeqNum(seq, p);
+	th.SetActNum(ack, p);
+	th.SetWinSize(windowsize, p);
+	th.SetHeaderLen(TCP_HEADER_MAX_LENGTH,p);
+	// do we need these?? 
+	//th.SetFlags(SOME CHAR, p);
+	//th.SetOptions(TCPOptions); 
+					
+	// push header onto packet after ip header
+	p.PushBackHeader(th);
+	
+	return 0; // lol need to return something else if an error occurred
+}					
+
 int main(int argc, char * argv[]) {
 
     MinetHandle mux;
@@ -233,6 +269,26 @@ int main(int argc, char * argv[]) {
                     case WRITE:
                     {
                         // TODO: Write stuff.
+						
+						// figure out seq and ack #'s, window size
+						
+						// create TCP segment with WriteIPToTCP
+						
+						// start timer
+						
+						// send segment to ip layer
+						MinetSend(mux, p);
+						
+						// set up for response from socket?????
+						SockRequestResponse repl;
+						// repl.type=SockRequestResponse::STATUS;
+						repl.type=STATUS;
+						repl.connection=req.connection;
+						repl.bytes=bytes;
+						repl.error=EOK;
+						MinetSend(sock,repl);
+						
+						// increment sequence number
                     }
                     break;
 
@@ -286,7 +342,8 @@ int main(int argc, char * argv[]) {
 
         // Timeout ! Probably need to resend some packets.
         if (event.eventtype == MinetEvent::Timeout) {
-
+			// Resend un-acked segment with smallest seq number
+			// also start timer again
         }
 
     } // END EVENT WHILE LOOP
