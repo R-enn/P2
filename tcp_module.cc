@@ -24,17 +24,10 @@
 
 #include "Minet.h"
 
+// Using the provided tcpstate stub.
+#include "tcpstate.h"
+
 using namespace std;
-
-struct TCPState {
-
-    // need to write this
-    std::ostream & Print(std::ostream &os) const { 
-	    os << "TCPState()" ; 
-	    return os;
-    }
-};
-
 
 int main(int argc, char * argv[]) {
 
@@ -80,7 +73,9 @@ int main(int argc, char * argv[]) {
             if (event.handle == mux) {
 
                 Packet p;
-                unsigned short len;
+                unsigned short len, header_len;
+                unsigned int ack, seq_num;
+                unsigned char flags;
                 bool checksumok;
 
                 // Recieves TCP packet from the IP_MUX and obtains information.
@@ -89,8 +84,66 @@ int main(int argc, char * argv[]) {
                 // Prints out the packet using the Minet IP. Messy af.
                 cout << "\n\n" << p.Print(cout);
 
-                // TODO: Extracts the header and performs a checksum.
+                // Extracts the headers (given the estimate).
+                header_len = TCPHeader::EstimateTCPHeaderLength(p);
+                p.ExtractHeaderFromPayload<TCPHeader>(header_len);
 
+                // Extracts the TCP header and performs a checksum.
+                TCPHeader tcph;
+                tcph = p.FindHeader(Headers::TCPHeader);
+                checksumok = tcph.IsCorrectChecksum(p);
+                
+                // Extracts the IP header. This holds the source and destination address.
+                IPHeader iph;
+                iph = p.FindHeader(Headers::IPHeader);
+
+                // Sets up the connection so that we can check it in our list.
+                Connection c;
+                iph.GetDestIP(c.src);
+                iph.GetSourceIP(c.dest);
+                iph.GetProtocol(c.protocol);
+                tcph.GetDestPort(c.srcport);
+                tcph.GetSourcePort(c.destport);
+
+                // Finds if we have a connection with them.
+                ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
+                if ( cs != clist.end() ) {
+
+                    // Obtains the mapped state.
+                    cout << "\n\nWe recognize this connection!\n";
+                    cout << cs.Print(cout) << "\n";
+
+                    // Calculates and extracts the data.
+                    tcph.GetHeaderLength(len);
+                    Buffer &data = p.GetPayLoad().ExtractBack(len);
+
+                    // DEBUG:
+                    cout << "\n\nChecks data that' we're sending.\n";
+                    cout << data << "\n";
+
+                    // Obtains the flags from the TCPheader.
+                    tcph.GetAckNum(ack);
+                    tcph.GetSeqNum(seq_num);
+                    tcph.GetFlags(flags);
+
+                    // Creates a socket response.
+                    SocketRequestResponse write(WRITE, (*cs).connection, data, len, EOK);
+
+                    // SET FLAGS based on packet.
+                    // Received a SYN from remote. Sends SYN+ACK back as Server.
+                    if ( IS_SYN(flags) ) {
+
+                        cout << "\n\nWants to connect. Recieved SYN segment from remote.\n";
+                        cout << "Setting up a new TCP state with the SYN_SENT flag " << eState::SYN_SENT << "\n";
+                        cs.state.SetState( eState::SYN_SENT );
+
+                    }
+
+
+                }
+                else {
+                    cout << "\n\nWe don't have this state?\n";
+                }                
             }
 
             // Socket request or response has arrived.
@@ -109,6 +162,7 @@ int main(int argc, char * argv[]) {
                 MinetReceive(sock, req);
 
                 // Prints the Socket Request
+                cout << "\n\n Printing out a Socket Request.\n";
                 cout << "\n\n" << req.Print(cout);
 
                 // Handles the different requests and responses based on type.
@@ -124,10 +178,39 @@ int main(int argc, char * argv[]) {
                         SockRequestResponse repl;
                         repl.type = STATUS;
                         repl.error = EOK;
+
+                        // Starts the passive open. Creating a new connection and state that is
+                        // in LISTEN mode.
+                        Connection c;
+                        c = repl.connection;
+                        
+                        cout << "\n\nPrinting out Connection in CONNECT request.\n\n";
+                        cout << c.Print(cout) << "\n";
+
+                        // Constructs new TCPState
+
                         MinetSend(sock,repl);
                     }
+
+                    // Passive open. We set up our "socket" and set our TCPState to listen.
                     case ACCEPT:
                     {
+                        ConnectionToStateMapping<TCPState> m;
+                        m.connection = req.connection;
+                        m.state.SetState(LISTEN);
+
+                        // Checking our mapping.
+                        cout << "\n\nPrinting the LISTEN flag: " << LISTEN << "\n";
+                        cout << "\n\nPrinting our Mapping.\n";
+                        cout << m.Print(cout);
+
+                        // Remove any old forward that might be there.
+                        ConnectionList<TCPState>::iterator cs = clist.FindMatching(req.connection);
+                        if ( cs!=clist.end()) {
+                            clist.erase(cs);
+                        }
+                        clist.push_back(m);
+
                         // Ignored. Send OK response.
                         SockRequestResponse repl;
                         repl.type = WRITE;

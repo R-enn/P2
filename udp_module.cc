@@ -79,7 +79,6 @@ int main(int argc, char *argv[])
                   // Extracts the header and performs a checksum. The UDPHeader is
                   // a 32-bit number consisting of the source and dest port #.
                   p.ExtractHeaderFromPayload<UDPHeader>(8);
-
                   
                   // Checks the UDP header.
                   UDPHeader udph;
@@ -111,7 +110,8 @@ int main(int argc, char *argv[])
                   // exists, then we found it. Else, there's an error. o-O
                   ConnectionList<UDPState>::iterator cs = clist.FindMatching(c);
 
-                  // Found a legitimate port? We extract the data and send a response. 
+                  // Found a legitimate port? We extract the data and update the sock module that we want
+                  // to WRITE. 
                   if ( cs!=clist.end() ) {
 
                       // Calculate and extract data.
