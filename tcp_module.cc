@@ -98,10 +98,13 @@ int main(int argc, char * argv[]) {
                 IPHeader iph_rem;
                 iph_rem = p.FindHeader(Headers::IPHeader);
 
+                // Initalizes connection 5-tuple to hold information: 
+                // (src_ip, src_port, dest_ip, dest_port, protocol)
+                Connection c;
+
                 // Sets up the connection so that we can check it in our list. This connection can be new.
                 // But we're going to use it to make sure that the packet is supposed to be sent to us.
                 // (Destination IP and Port point to this machine)
-                Connection c;
                 iph_rem.GetDestIP(c.src);
                 iph_rem.GetSourceIP(c.dest);
                 iph_rem.GetProtocol(c.protocol);
@@ -114,8 +117,8 @@ int main(int argc, char * argv[]) {
                 if ( cs != clist.end() ) {
 
                     // DEBUG:
-                    cout << "\n\nWe recognize this connection!\n";
-                    cout << (*cs).connection.Print(cout) << "\n";
+                    cout << "\n\nConnection exists or the destination is correct.\n";
+                    cout << (*cs).connection.Print(cout);
 
                     // Obtains the flags from the remote TCPheader.
                     tcph_rem.GetAckNum(ack_rem);
@@ -125,15 +128,36 @@ int main(int argc, char * argv[]) {
                     // DEBUG: Prints out our remote TCPheader.
                     cout << "\n\nRemote TCP Header\n";
                     cout << tcph_rem.Print(cout);
+
+                    // There are three scenarios that can occur during the three way handshake.
+                    // Server recieves an SYN.
+                    // Client recieves a SYN+ACK.
+                    // Server recieves an ACK.
+                    // Technically, given the "TCPState" we should be able to determine what we're
+                    // expecting to recieve. But not using that at the moment.
+
+                    // Recieves a SYN and ACK from server. (Only case)
+                    if ( IS_SYN(flags) && IS_ACK(flags) ) { }
                     
-                    // SET FLAGS based on packet.
                     // Received a SYN from remote. Sends SYN+ACK back as Server.
                     if ( IS_SYN(flags) ) {
 
                         // DEBUG:
-                        cout << "\n\nRecieved SYN flag from remote. It wants to connect.\n";
+                        cout << "\n\nRecieved SYN flag from remote. It wants to start a connection.\n";
+
+                        // Adds the "new" connection to our list so that we can keep track of it. This was
+                        // already initialized as c.        
+                        clist.
+
+                        // We're not going to keep track of the state at the moment.
 
                         // Creates packet to send out.
+
+                    }
+
+                    // Recieves ACK from remote.
+                    if ( IS_ACK(flags) ) {
+
 
                     }
 
@@ -211,7 +235,9 @@ int main(int argc, char * argv[]) {
                         }
                         clist.push_back(m);
 
-                        // Ignored. Send OK response.
+                        // We've bound a connection locally, but we haven't connected to a remote as
+                        // of this moment. We should just send a status. WRITE only occurs after the
+                        // connection is established via the three-way handshake.
                         SockRequestResponse repl;
                         repl.type = WRITE;
                         repl.connection = req.connection;
