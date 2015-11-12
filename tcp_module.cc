@@ -112,6 +112,10 @@ int main(int argc, char * argv[]) {
                 tcph_rem.GetDestPort(c.srcport);
                 tcph_rem.GetSourcePort(c.destport);
 
+                // DEBUG: Prints out Remote IPHeader.
+                cout << "\n\nRemote IPHeader.\n";
+                cout << iph_rem.Print(cout);
+
                 // Finds if we have an existing connection with them, or if they want to open up a 
                 // connection. We're assuming hand shake, so no data right now.
                 ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
@@ -130,6 +134,11 @@ int main(int argc, char * argv[]) {
                     cout << "\n\nRemote TCP Header\n";
                     cout << tcph_rem.Print(cout);
 
+                    // DEBUG: Printing out Ack number manually.
+                    cout << "\n\nPrinting out Sequence Number extracted from TCPHeader\n";
+                    cout << seqnum_rem;
+
+                    // THREE WAY HANDSHAKE
                     // There are three scenarios that can occur during the three way handshake.
                     // Server recieves an SYN.
                     // Client recieves a SYN+ACK.
@@ -160,12 +169,9 @@ int main(int argc, char * argv[]) {
                         new_tcp_state.state.SetState(eState::SYN_RCVD);      
 
                         // Adds the "last acked" value, or the sequence number of the SYN packet we just
-                        // recieved from the remote.
-                        new_tcp_state.state.SetLastAcked(seqnum_rem);
-
-                        // Retrieves our initialized sequence number (should be 0). TODO: Randomize this later.
-                        unsigned int seqnum_src;
-                        seqnum_src = new_tcp_state.state.GetLastAcked();
+                        // recieved from the remote. Actually, the ACK'd value is what *WE* recieve.
+                        // XXX: This is actually lastrcvd
+                        // new_tcp_state.state.SetLastAcked(seqnum_rem);
 
                         // Pushes this new state mapping into our Connections list.
                         clist.push_back(new_tcp_state);
@@ -186,7 +192,7 @@ int main(int argc, char * argv[]) {
                         // XXX: Fix this later?
                         // We need to compute and set the total length? Not exactly sure about this
                         // computation. This may be different when we actually have data. Dunno.
-                        iph_src.SetTotalLength(TCP_HEADER_BASE_LENGTH+IP_HEADER_BASE_LENGTH);
+                        iph_src.SetTotalLength(TCP_HEADER_OPTION_MAX_LENGTH+IP_HEADER_BASE_LENGTH);
 
                         // DEBUG: Created IPHeader
                         cout << "\n\nCreated new source IPHeader.\n";
@@ -202,7 +208,7 @@ int main(int argc, char * argv[]) {
                         TCPHeader tcph_src;
                         tcph_src.SetSourcePort(c.srcport, reply);
                         tcph_src.SetDestPort(c.destport, reply);
-                        tcph_src.SetHeaderLen(TCP_HEADER_BASE_LENGTH, reply);
+                        tcph_src.SetHeaderLen(TCP_HEADER_OPTION_MAX_LENGTH, reply);
 
                         // Creates our flags. We want to send a SYN and ACK.
                         unsigned char flags_src;
@@ -210,7 +216,7 @@ int main(int argc, char * argv[]) {
                         SET_ACK(flags_src);
 
                         // Sets our flags, window size, ack number,  and sequence number in Source TCPHeader.
-                        tcph_src.SetAckNum(new_tcp_state.state.GetLastAcked(), reply);
+                        tcph_src.SetAckNum(seqnum_rem, reply);
                         tcph_src.SetSeqNum(new_tcp_state.state.GetLastSent(), reply);
                         tcph_src.SetWinSize(new_tcp_state.state.GetN(), reply);
                         tcph_src.SetFlags(flags_src, reply);
@@ -228,6 +234,10 @@ int main(int argc, char * argv[]) {
                     if ( IS_ACK(flags_rem) ) {
                         cout << "\n\nRecieved an ACK. Not implemented.\n";
                     }
+
+                    // In actuality, depending on the TCPState of the connection, we can determine the
+                    // case of how we should treat the packet. i.e. TCPState is ESTABLISHED, then ACKS
+                    // are expected to push data up to the Sock > Application.
 
 
                 }
@@ -303,6 +313,7 @@ int main(int argc, char * argv[]) {
                         }
                         clist.push_back(m);
 
+                        // XXX
                         // We've bound a connection locally, but we haven't connected to a remote as
                         // of this moment. We should just send a status. WRITE only occurs after the
                         // connection is established via the three-way handshake.
@@ -318,12 +329,15 @@ int main(int argc, char * argv[]) {
                     break;
             
                     // STATUS
-                    // This is NOT ignored in TCP. It's basically a status update. The should be sent in
-                    
+                    // This is NOT ignored in TCP. It's basically a status update for how much data
+                    // was read in the SOCK. It determine whether or not we should send more data from
+                    // our buffer (?). 
                     case STATUS:
                     break;
 
                     // WRITE
+                    // The application sends data down to the socket for the host to send out to a
+                    // remote. We create a packet with the given connection.
                     case WRITE:
                     {
                         // TODO: Write stuff.
