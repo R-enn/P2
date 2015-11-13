@@ -1,4 +1,5 @@
 
+
 // You will build this in project part B - this is merely a
 // stub that does nothing but integrate into the stack
 
@@ -82,7 +83,7 @@ int main(int argc, char * argv[]) {
                 MinetReceive(mux, p);
 
                 // Prints out the packet using the Minet IP.
-                cout << "\n\nRecieved Packet\n" << p.Print(cout);
+                cout << "\n\nRecieved Packet\n";
 
                 // Extracts the headers (given the estimate). Technically, we should be calculating this
                 // ourselves. Something to do with a number times 4.
@@ -116,134 +117,105 @@ int main(int argc, char * argv[]) {
                 cout << "\n\nRemote IPHeader.\n";
                 cout << iph_rem.Print(cout);
 
-                // Finds if we have an existing connection with them, or if they want to open up a 
-                // connection. We're assuming hand shake, so no data right now.
-                ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
-                if ( cs != clist.end() ) {
+
+                // Obtains flags from TCP Header.
+                tcph_rem.GetAckNum(ack_rem);
+                tcph_rem.GetSeqNum(seqnum_rem);
+                tcph_rem.GetFlags(flags_rem);
+                
+                // DEBUG: Prints out our remote TCPheader.
+                cout << "\n\nRemote TCP Header\n";
+                cout << tcph_rem.Print(cout);
+
+                // THREE WAY HANDSHAKE
+                // There are three scenarios that can occur during the three way handshake.
+                // Server recieves an SYN.
+                // Client recieves a SYN+ACK.
+                // Server recieves an ACK.
+                // Technically, given the "TCPState" we should be able to determine what we're
+                // expecting to recieve. But not using that at the moment.
+
+                // Recieves a SYN and ACK from server. (Only client will recieve this)
+                if ( IS_SYN(flags_rem) && IS_ACK(flags_rem) ) {
+                    cout << "\n\nRecieved a SYN and ACK. Not implemented.\n";
+                }
+
+                // Recieved a SYN from remote. Send SYN+ACK back as Server. Only sending back a packet.
+                // We're not worried about the TCPState.
+                else if ( IS_SYN(flags_rem) ) {
+
+                    cout << "\n\nRecieved a SYN flag from remote. Starting connection.\n";
+
+                    // We need to reply with a packet with a SYN and ACK flag set.
+                    Packet reply;
+
+                    // .__________.
+                    //_| IPHEADER |_
+                    // Creates the IPHeader to encapsulate our TCP datagram. Three main things.
+                    // IPHeader contains the protocol, Source, and Destination IP.
+                    IPHeader iph_src;
+                    iph_src.SetProtocol(IP_PROTO_TCP);
+                    iph_src.SetSourceIP(c.src);
+                    iph_src.SetDestIP(c.dest);
+
+                    // Sets the IPHeader total length.
+                    iph_src.SetTotalLength(TCP_HEADER_OPTION_MAX_LENGTH+IP_HEADER_BASE_LENGTH);
+
+                    // DEBUG: Created IPHeader
+                    cout << "\n\nCreated new source IPHeader.\n";
+                    cout << iph_src.Print(cout);
+
+                    // Pushes the IPHeader into our Packet.
+                    reply.PushFrontHeader(iph_src);
+
+                    // .___________.
+                    //_| TCPHEADER |_
+                    // Creates the TCPHeader. Includes important info for the remote the check.
+                    // ( source port, destination port, length, ack, seqnum, flags, windsize )
+                    TCPHeader tcph_src;
+                    tcph_src.SetSourcePort(c.srcport, reply);
+                    tcph_src.SetDestPort(c.destport, reply);
+
+                    // Calculates the TCPHeader length. The defined values in tcp.h are actually
+                    // the number of bytes when they when they should be the number of 32-bit words. 
+                    // We need to convert this number to word; as there are 4 bytes in a word, the
+                    // calculation is TCP_HEADER_LEN >> 2.
+                    unsigned word_len;
+                    word_len = TCP_HEADER_BASE_LENGTH >> 2;
+                    tcph_src.SetHeaderLen(word_len, reply);
+
+                    // Creates our flags. We want to send a SYN and ACK.
+                    unsigned char flags_src = 0;
+                    SET_SYN(flags_src);
+                    SET_ACK(flags_src);
+
+                    // Sets our flags, window size, ack number, and sequence number in Source TCPHeader.
+                    tcph_src.SetAckNum(seqnum_rem+1, reply);
+                    tcph_src.SetSeqNum(1, reply);
+                    tcph_src.SetFlags(flags_src, reply);
 
                     // DEBUG:
-                    cout << "\n\nConnection exists or the destination is correct.\n";
-                    cout << (*cs).connection.Print(cout);
+                    cout << "\n\nCreated new source TCPHeader.\n";
+                    cout << tcph_src.Print(cout) << "\n\n";
 
-                    // Obtains the flags from the remote TCPheader.
-                    tcph_rem.GetAckNum(ack_rem);
-                    tcph_rem.GetSeqNum(seqnum_rem);
-                    tcph_rem.GetFlags(flags_rem);
+                    // Pushes TCPheader onto our Packet and sends to IP_MUX.
+                    reply.PushBackHeader(tcph_src);
+                    MinetSend(mux, reply);
+                } 
 
-                    // DEBUG: Prints out our remote TCPheader.
-                    cout << "\n\nRemote TCP Header\n";
-                    cout << tcph_rem.Print(cout);
-
-                    // DEBUG: Printing out Ack number manually.
-                    cout << "\n\nPrinting out Sequence Number extracted from TCPHeader\n";
-                    cout << seqnum_rem;
-
-                    // THREE WAY HANDSHAKE
-                    // There are three scenarios that can occur during the three way handshake.
-                    // Server recieves an SYN.
-                    // Client recieves a SYN+ACK.
-                    // Server recieves an ACK.
-                    // Technically, given the "TCPState" we should be able to determine what we're
-                    // expecting to recieve. But not using that at the moment.
-
-                    // Recieves a SYN and ACK from server. (Only case)
-                    if ( IS_SYN(flags_rem) && IS_ACK(flags_rem) ) {
-                        cout << "\n\nRecieved a SYN and ACK. Not implemented.\n";
-                    }
-                    
-                    // Received a SYN from remote. Sends SYN+ACK back as Server.
-                    if ( IS_SYN(flags_rem) ) {
-
-                        // DEBUG:
-                        cout << "\n\nRecieved SYN flag from remote. It wants to start a connection.\n";
-
-                        // We need to reply with a packet with a SYN and ACK flag set.
-                        Packet reply;
-
-                        // .__________________________________.
-                        //_| TCP_STATE AND CONNECTION MAPPING |_
-                        // Adds the "new" connection to our list so that we can keep track of it. This was
-                        // already initialized as c. We create a new Connection State mapping to this.
-                        ConnectionToStateMapping<TCPState> new_tcp_state;
-                        new_tcp_state.connection = c;
-                        new_tcp_state.state.SetState(eState::SYN_RCVD);      
-
-                        // Adds the "last acked" value, or the sequence number of the SYN packet we just
-                        // recieved from the remote. Actually, the ACK'd value is what *WE* recieve.
-                        // XXX: This is actually lastrcvd
-                        // new_tcp_state.state.SetLastAcked(seqnum_rem);
-
-                        // Pushes this new state mapping into our Connections list.
-                        clist.push_back(new_tcp_state);
-
-                        // DEBUG: Print out our new TCPState.
-                        cout << "\n\nCreated new TCPState to Connection Mapping.\n";
-                        cout << new_tcp_state.Print(cout);
-
-                        // .__________.
-                        //_| IPHEADER |_
-                        // Creates the IPHeader to encapsulate our TCP datagram. Three main things.
-                        // IPHeader contains the protocol, Source, and Destination IP.
-                        IPHeader iph_src;
-                        iph_src.SetProtocol(IP_PROTO_TCP);
-                        iph_src.SetSourceIP(c.src);
-                        iph_src.SetDestIP(c.dest);
-
-                        // XXX: Fix this later?
-                        // We need to compute and set the total length? Not exactly sure about this
-                        // computation. This may be different when we actually have data. Dunno.
-                        iph_src.SetTotalLength(TCP_HEADER_OPTION_MAX_LENGTH+IP_HEADER_BASE_LENGTH);
-
-                        // DEBUG: Created IPHeader
-                        cout << "\n\nCreated new source IPHeader.\n";
-                        cout << iph_src.Print(cout);
-
-                        // Pushes the IPHeader into our Packet.
-                        reply.PushFrontHeader(iph_src);
-
-                        // .___________.
-                        //_| TCPHEADER |_
-                        // Creates the TCPHeader. Includes important info for the remote the check.
-                        // ( source port, destination port, length, ack, seqnum, flags, windsize )
-                        TCPHeader tcph_src;
-                        tcph_src.SetSourcePort(c.srcport, reply);
-                        tcph_src.SetDestPort(c.destport, reply);
-                        tcph_src.SetHeaderLen(TCP_HEADER_OPTION_MAX_LENGTH, reply);
-
-                        // Creates our flags. We want to send a SYN and ACK.
-                        unsigned char flags_src;
-                        SET_SYN(flags_src);
-                        SET_ACK(flags_src);
-
-                        // Sets our flags, window size, ack number,  and sequence number in Source TCPHeader.
-                        tcph_src.SetAckNum(seqnum_rem, reply);
-                        tcph_src.SetSeqNum(new_tcp_state.state.GetLastSent(), reply);
-                        tcph_src.SetWinSize(new_tcp_state.state.GetN(), reply);
-                        tcph_src.SetFlags(flags_src, reply);
-
-                        // DEBUG:
-                        cout << "\n\nCreated new source TCPHeader.\n";
-                        cout << tcph_src.Print(cout);
-
-                        // Pushes TCPheader onto our Packet and sends to IP_MUX.
-                        reply.PushBackHeader(tcph_src);
-                        MinetSend(mux, reply);
-                    }
-
-                    // Recieves ACK from remote.
-                    if ( IS_ACK(flags_rem) ) {
-                        cout << "\n\nRecieved an ACK. Not implemented.\n";
-                    }
-
-                    // In actuality, depending on the TCPState of the connection, we can determine the
-                    // case of how we should treat the packet. i.e. TCPState is ESTABLISHED, then ACKS
-                    // are expected to push data up to the Sock > Application.
-
-
+                // Recieves ACK from remote.
+                else if ( IS_ACK(flags_rem) ) {
+                    cout << "\n\nRecieved an ACK. Not implemented.\n";
                 }
+
+                // In actuality, depending on the TCPState of the connection, we can determine the
+                // case of how we should treat the packet. i.e. TCPState is ESTABLISHED, then ACKS
+                // are expected to push data up to the Sock > Application.
+
+                // FLAG is not part of the three-way-handshake.
                 else {
-                    cout << "\n\nWe don't have this state?\n";
-                }                
+                    cout << "\n\nNot part of the three-way-handshake.\n";
+                }
             }
 
             // Socket request or response has arrived.
@@ -398,7 +370,7 @@ int main(int argc, char * argv[]) {
 
         }
 
-    } // END EVENT WHILE LOOP
+    } // END WHILE LOOP
 
     MinetDeinit();
     return 0;
