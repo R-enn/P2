@@ -158,8 +158,9 @@ int main(int argc, char * argv[]) {
                     iph_src.SetSourceIP(c.src);
                     iph_src.SetDestIP(c.dest);
 
-                    // Sets the IPHeader total length.
-                    iph_src.SetTotalLength(TCP_HEADER_OPTION_MAX_LENGTH+IP_HEADER_BASE_LENGTH);
+                    // Sets the IPHeader total length. This is the length of the IPHEADER and its
+                    // Payload. This is the size in bytes.
+                    iph_src.SetTotalLength(TCP_HEADER_BASE_LENGTH+IP_HEADER_BASE_LENGTH);
 
                     // DEBUG: Created IPHeader
                     cout << "\n\nCreated new source IPHeader.\n";
@@ -177,8 +178,8 @@ int main(int argc, char * argv[]) {
                     tcph_src.SetDestPort(c.destport, reply);
 
                     // Calculates the TCPHeader length. The defined values in tcp.h are actually
-                    // the number of bytes when they when they should be the number of 32-bit words. 
-                    // We need to convert this number to word; as there are 4 bytes in a word, the
+                    // the number of bytes when they should be the number of 32-bit words. We need 
+                    // to convert this number to word; as there are 4 bytes in a word, the
                     // calculation is TCP_HEADER_LEN >> 2.
                     unsigned word_len;
                     word_len = TCP_HEADER_BASE_LENGTH >> 2;
@@ -189,9 +190,9 @@ int main(int argc, char * argv[]) {
                     SET_SYN(flags_src);
                     SET_ACK(flags_src);
 
-                    // Sets our flags, window size, ack number, and sequence number in Source TCPHeader.
+                    // Sets our flags, ack number, and sequence number in Source TCPHeader.
                     tcph_src.SetAckNum(seqnum_rem+1, reply);
-                    tcph_src.SetSeqNum(1, reply);
+                    tcph_src.SetSeqNum(0, reply);
                     tcph_src.SetFlags(flags_src, reply);
 
                     // DEBUG:
