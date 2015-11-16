@@ -340,6 +340,9 @@ int main(int argc, char * argv[]) {
                     // CLOSE
                     case CLOSE:
                     {
+                        // DEBUG:
+                        cout << "\n\nSock request to close.\n\n";
+
                         // Sets up SocketReply. Just a status.
                         SockRequestResponse repl;
                         repl.connection = req.connection;
