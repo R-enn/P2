@@ -136,6 +136,7 @@ int main(int argc, char * argv[]) {
                 // Technically, given the "TCPState" we should be able to determine what we're
                 // expecting to recieve. But not using that at the moment.
 
+                // _ CLIENT SYN AND ACK
                 // Recieves a SYN and ACK from server. (Only client will recieve this)
                 if ( IS_SYN(flags_rem) && IS_ACK(flags_rem) ) {
 
@@ -186,10 +187,11 @@ int main(int argc, char * argv[]) {
 
                     // Sets our flags, ack number, and sequence number in Source TCPHeader.
                     // I don't think we add one to this. Our next sequence number is hardcoded
-                    // for testing purposes.
+                    // for testing purposes. TODO: Set up legitimate Recv Window.
                     tcph_src.SetAckNum(seqnum_rem, reply);
                     tcph_src.SetSeqNum(1, reply);
                     tcph_src.SetFlags(flags_src, reply);
+                    tcph_src.SetWinSize(512, reply);
 
                     // DEBUG:
                     cout << "\n\nCreated new source TCPHeader.\n";
