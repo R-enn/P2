@@ -186,9 +186,9 @@ int main(int argc, char * argv[]) {
                     SET_ACK(flags_src);
 
                     // Sets our flags, ack number, and sequence number in Source TCPHeader.
-                    // I don't think we add one to this. Our next sequence number is hardcoded
-                    // for testing purposes. TODO: Set up legitimate Recv Window.
-                    tcph_src.SetAckNum(seqnum_rem, reply);
+                    // Our next sequence number is hardcoded for testing purposes. 
+                    // TODO: Set up legitimate Recv Window.
+                    tcph_src.SetAckNum(seqnum_rem+1, reply);
                     tcph_src.SetSeqNum(1, reply);
                     tcph_src.SetFlags(flags_src, reply);
                     tcph_src.SetWinSize(512, reply);
@@ -205,7 +205,7 @@ int main(int argc, char * argv[]) {
                     SockRequestResponse repl;
                     repl.type = WRITE;
                     repl.error = EOK;
-                    //MinetSend(sock, repl);
+                    MinetSend(sock, repl);
                 }
 
                 // Recieved a SYN from remote. Send SYN+ACK back as Server. Only sending back a packet.
