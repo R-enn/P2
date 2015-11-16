@@ -204,9 +204,26 @@ int main(int argc, char * argv[]) {
                     MinetSend(mux, reply);
                 } 
 
-                // Recieves ACK from remote.
+                //  .__________.
+                // _| ACK FLAG |_
+                // Recieves ACK from remote. Once we get this, and validation checks out, the 
+                // connection is ESTABLISHED and we can notify the application (SOCK).
                 else if ( IS_ACK(flags_rem) ) {
+
                     cout << "\n\nRecieved an ACK. Not implemented.\n";
+
+                    // We need to send info to our SOCK that the connection is now ESTABLISED.
+                    // In reality, we'd double check the ACK matches up with a given TCPSTATE.
+                    SockRequestResponse reply;
+
+                    // This SockRequest is a zero byte WRITE with the fully bound connection.
+                    reply.type = WRITE;
+                    reply.connection = c;
+                    reply.bytes = 0;
+                    reply.error = EOK;
+
+                    // Sends up to SOCK.
+                    MinetSend(sock,reply);
                 }
 
                 // In actuality, depending on the TCPState of the connection, we can determine the
@@ -270,14 +287,10 @@ int main(int argc, char * argv[]) {
                     // connection mapping when we recieve a SYN packet from remote client. 
                     case ACCEPT:
                     {
+                        // Create our persisting mapping to the LISTEN sock.
                         ConnectionToStateMapping<TCPState> m;
                         m.connection = req.connection;
                         m.state.SetState(LISTEN);
-
-                        // Checking our mapping.
-                        cout << "\n\nPrinting the LISTEN flag: " << LISTEN << "\n";
-                        cout << "\n\nPrinting our Mapping.\n";
-                        cout << m.Print(cout);
 
                         // Remove any old forward that might be there.
                         ConnectionList<TCPState>::iterator cs = clist.FindMatching(req.connection);
@@ -286,16 +299,11 @@ int main(int argc, char * argv[]) {
                         }
                         clist.push_back(m);
 
-                        // XXX
                         // We've bound a connection locally, but we haven't connected to a remote as
-                        // of this moment. We should just send a status. WRITE only occurs after the
-                        // connection is established via the three-way handshake.
+                        // of this moment. We just send a STATUS with the error code set. WRITE only 
+                        // occurs after the connection is established via the three-way handshake.
                         SockRequestResponse repl;
-                        repl.type = WRITE;
-                        repl.connection = req.connection;
-
-                        // Buffer is zero bytes.
-                        repl.bytes = 0;
+                        repl.type = STATUS;
                         repl.error = EOK;
                         MinetSend(sock,repl);
                     }
