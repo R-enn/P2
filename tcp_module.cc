@@ -200,10 +200,10 @@ int main(int argc, char * argv[]) {
                     MinetSend(mux, reply);
 
                     // Connection is now ESTABLISHED. Send WRITE to SOCK.
-                    SockRequestReponse reply;
-                    reply.type = WRITE;
-                    reply.error = EOK;
-                    //MinetSend(sock, reply);
+                    SockRequestResponse repl;
+                    repl.type = WRITE;
+                    repl.error = EOK;
+                    //MinetSend(sock, repl);
                 }
 
                 // Recieved a SYN from remote. Send SYN+ACK back as Server. Only sending back a packet.
