@@ -144,9 +144,35 @@ int main(int argc, char * argv[]) {
                 // - Server recieves an SYN.
                 // - Client recieves a SYN+ACK.
                 // - Server recieves an ACK.
+				//
                 // Technically, given the "TCPState" we should be able to determine what we're
                 // expecting to recieve. But not using that at the moment.
+				
+				//  ._________________.
+				// _| SERVER SYN_RCVD |_
+				// Server recieved a SYN (no ACK). We create a new TCPState > Connection mapping.
+				if ( IS_SYN(flags_rem) && !IS_ACK(flags_rem) ) {
+					
+					// Creates our mapping to this new connection. We bind this connection locally and
+					// will handle it after we find it in our ConnectionList.
+					ConnectionToStateMapping<TCPState> m;
+					m.connection = c;
+					m.state.SetState(SYN_RCVD);
+					
+					// TODO: Add more to this TCPState here before pushing onto our ConnectionList.
 
+					// Remove any old forwarding that might be there. Assuming that a previous connection
+					// has already been closed.
+					ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
+					if ( cs != clist.end() ) {
+						clist.erase(cs);
+					}
+					
+					// Adds our new connection mapping to the connection list.
+					clist.push_back(m);
+				}
+				
+				
                 // _ CLIENT SYN AND ACK
                 // Recieves a SYN and ACK from server. (Only client will recieve this)
                 if ( IS_SYN(flags_rem) && IS_ACK(flags_rem) ) {
@@ -315,6 +341,52 @@ int main(int argc, char * argv[]) {
                 else {
                     cout << "\n\nNot part of the three-way-handshake.\n";
                 }
+				
+				// Searches through our ConnectionList mapping to find the associated TCPState to handle.
+				ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
+				if ( cs!=clist.end() ) {
+					 
+					// DEBUG:
+					cout << "\n\nFound Connection in our ConnectionListMapping\n"
+					cout << cs.Print(cout);
+					 
+					// Handles TCPStates.
+					switch (cs.state.GetState()) {
+					
+					 
+						// Server has recieved a SYN, we can then start sending out our SYN+ACK and transition
+						// to the state: SYN_SENT.
+						SYN_RCVD: {
+							
+						}
+						break;
+						 
+						// With Established, we extract the the data and send it up to our application. At this point
+						// the packet SHOULD have application data.
+						ESTABLISHED: {
+							 
+						}
+						break;
+						
+						// Client AND Server.
+						// If the current TCPState is SYN_SENT, then we are expecting an ACK from the remote. If we
+						// recieve that ACK, then the connection is ESTABLISHED. We can change the TCPState.
+						SYN_SENT: {
+							 
+						}
+						break;
+						 
+						// I'm just adding examples here now.
+						FIN_RCVD: {
+							 
+						}
+						break;
+					} 	 
+				}
+				else {
+					cout << "\n\nERROR: ConnectionMapping was not found.\n"
+				}
+				
             }
 
             // Socket request or response has arrived.
