@@ -127,6 +127,17 @@ int main(int argc, char * argv[]) {
                 cout << tcph_rem.Print(cout);
 
                 // TODO: EXTRACT THE DATA FROM THE PACKET.
+				
+				// TODO: PLAN
+				// 1. We determine a new connection if the packet has a SYN. This is a separate request from a client
+				// 	  to connect with us. (This will only happen on the server side)
+				// 2. We create a new TCPState and map it to this new connection. We can then add this to our connection
+				//    list. The initial TCPState will be SYN_RECVD.
+				// 3. If it is not a SYN packet, then assume that we already have a Connection Mapping to it. Thus it should
+				//    be in our connection list.
+				// 4. We'll check to see if it actually is in our connection mapping list (and this should hold the TCPState)
+				// 5. Minet API allows us to check the TCPState state (SYN_RECVD, ESTABLISHED, etc). We can the switch case
+				//    our behavior on this state. Hand everything from there.
 
                 // THREE WAY HANDSHAKE
                 // There are three scenarios that can occur during the three way handshake.
