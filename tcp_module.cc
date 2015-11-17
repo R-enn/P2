@@ -157,7 +157,7 @@ int main(int argc, char * argv[]) {
 					// will handle it after we find it in our ConnectionList.
 					ConnectionToStateMapping<TCPState> m;
 					m.connection = c;
-					m.state.SetState(SYN_RCVD);
+					m.state.SetState(LISTEN);
 					
 					// TODO: Add more to this TCPState here before pushing onto our ConnectionList.
 
@@ -253,6 +253,9 @@ int main(int argc, char * argv[]) {
 
                     // We need to reply with a packet with a SYN and ACK flag set.
                     Packet reply;
+					
+					// Function where we send in a packet, and the connection, and the flags that we want
+					// to set? (Bytes, or the data)
 
                     // .__________.
                     //_| IPHEADER |_
@@ -347,17 +350,39 @@ int main(int argc, char * argv[]) {
 				if ( cs!=clist.end() ) {
 					 
 					// DEBUG:
-					cout << "\n\nFound Connection in our ConnectionListMapping\n"
+					cout << "\n\nFound Connection in our ConnectionListMapping.\n"
 					cout << cs.Print(cout);
 					 
 					// Handles TCPStates.
 					switch (cs.state.GetState()) {
 					
-					 
 						// Server has recieved a SYN, we can then start sending out our SYN+ACK and transition
-						// to the state: SYN_SENT.
-						SYN_RCVD: {
+						// to the state: SYN_RCVD.
+						LISTEN: {
 							
+							// We need to reply with a packet with a SYN and ACK flag set.
+							Packet reply;
+							
+							// Sets our flags. We want to send a SYN and ACK.
+							unsigned char flags_src = 0;
+							SET_ACK(flags_src);
+							SET_SYN(flags_src);
+							
+							// Creates a new packet. Using the following custom function:
+							// CreatePacket( packet, ack_num, seq_num, flags, data, rcvwin )
+							CreatePacket( &reply, seq_num+1, 0, flags_src, &data)
+							
+							// Send out Packet.
+							MinetSend(mux, reply);
+							
+							// Update TCPState. We go to SYN_RCVD on the Server end. We also note our init SeqNumber, the
+							// ack number, etc etc.
+							cs.state.SetState(SYN_RCVD);
+							cs.state.SetLastAck(seq_num+1) // This might just be one. I don't know.
+							
+							// DEBUG: Prints out TCPSTATE.
+							cout << "\n\nHandled LISTEN state on server. Updated State is now:\n";
+							cout << cs.state.Print(cout);
 						}
 						break;
 						 
@@ -370,7 +395,8 @@ int main(int argc, char * argv[]) {
 						
 						// Client AND Server.
 						// If the current TCPState is SYN_SENT, then we are expecting an ACK from the remote. If we
-						// recieve that ACK, then the connection is ESTABLISHED. We can change the TCPState.
+						// recieve that ACK, then the connection is ESTABLISHED. We can change the TCPState. If we
+						// have issues with the ACK, then there's an ERROR.
 						SYN_SENT: {
 							 
 						}
