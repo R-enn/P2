@@ -6,8 +6,6 @@
 // For project parts A and B, an appropriate binary will be 
 // copied over as part of the build process
 
-
-
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -208,6 +206,9 @@ int main(int argc, char * argv[]) {
 				// _| SERVER SYN_RCVD |_
 				// Server recieved a SYN (no ACK). We create a new TCPState > Connection mapping.
 				if ( IS_SYN(flags_rem) && !IS_ACK(flags_rem) ) {
+
+                    cout << "\n\nRecieved SYN. Remote is requesting to connect to server.\n";
+                    cout << "Adding a new connection to state mapping.\n";
 					
 					// Creates our mapping to this new connection. We bind this connection locally and
 					// will handle it after we find it again in our ConnectionList.
@@ -216,14 +217,18 @@ int main(int argc, char * argv[]) {
 					m.state.SetState(LISTEN);
 
 					// Remove any old forwarding that might be there. Assuming that a previous connection
-					// has already been closed.
+					// has already been closed. Um, actually. Might not be a good idea to remove it? XD
+                    // Only remove it if we didnt' add it recently.
 					ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
 					if ( cs != clist.end() ) {
-						clist.erase(cs);
+                        if ( (*cs).state.GetState() != LISTEN ) {
+						    clist.erase(cs);
+                            clist.push_back(m);
+                        }
 					}
-					
-					// Adds our new connection mapping to the connection list.
-					clist.push_back(m);
+                    else {
+                        clist.push_back(m);
+                    }
 				}
 				
                 //  .__________.
@@ -320,8 +325,32 @@ int main(int argc, char * argv[]) {
                         case SYN_RCVD: 
                         {
                             // DEBUG:
-                            cout << "SYN_RCVD case. Server will inform sock that connection is ESTABLISHED.\n";
-                            cout << "Not implemented at the moment.\n";
+                            cout << "\n\nSYN_RCVD case. Server will inform sock that connection is ESTABLISHED.\n";
+
+                            // Validates the ACK number.
+                            unsigned int seqnum_last = (*cs).state.GetLastSent();
+
+                            // DEBUG: Checking sequence and ACK numbers.
+                            cout << "\n\nChecking Last Sequence and Recieved ACK number.\n";
+                            cout << "Sequence Number: " << seqnum_last << " | Recieved ACK: " << ack_rem << " \n";
+                            
+                            if ( seqnum_last+1 == ack_rem ) {
+                                cout << "\n\nSEQ+1 and ACK MATCHES.\n";
+                            }
+                            else if ( seqnum_last == ack_rem ) {
+                                cout << "\n\nSEQ and ACK Matches.\n";
+                            }
+                            else {
+                                cout << "\n\nValidation error. ACK and Sequence numbers aren't compatible.\n";
+                            }
+
+                            // Notify server that the connection has been established.
+                            /*
+                            SockRequestResponse reply;
+                            reply.type = WRITE;
+                            reply.error = EOK;
+                            MinetSent(sock,reply);
+                            */
                         }
 
                         // Client Only.
