@@ -30,6 +30,7 @@
 using namespace std;
 
 int WritePacket(SockRequestResponse req, int ack, int seq, short windowsize, Packet ret) {
+
 	// get size of data, or max size that fits in one segment
 	// this can be in bytes and not words?
 	unsigned bytes = MIN_MACRO(TCP_MAXIMUM_SEGMENT_SIZE, req.data.GetSize());
