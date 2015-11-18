@@ -280,9 +280,9 @@ int main(int argc, char * argv[]) {
 							Packet reply;
 
                             // Extracts the initailized Sequence number from the TCPState.
-                            unsigned int seq_num = (*cs).state.GetLastSent();
-                            unsigned int win_size = (*cs).state.GetRwnd();
-                            unsigned int ack_num = seqnum_rem+1;
+                            unsigned int ack_num = cs.state.GetLastSent();
+                            unsigned int win_size = cs.state.GetRwnd();
+                            unsigned int seq_num = ack_rem+1;
 							
 							// Sets our flags. We want to send a SYN and ACK.
 							unsigned char flags_src = 0;
@@ -291,7 +291,7 @@ int main(int argc, char * argv[]) {
 							
 							// Creates a new packet. Using the following custom function:
 							// CreatePacket( packet, connection, flags, ack_num, seq_num, win_size);
-							CreatePacket( reply, c, flags_src, ack_num, seq_num, win_size, cout );
+							CreatePacket( reply, c, flags_src, seq_num, ack_num, win_size, cout );
 
                             // DEBUG:
                             cout << "\n\nDouble Checking Packet Creationg out of Function.\n";
@@ -330,7 +330,46 @@ int main(int argc, char * argv[]) {
                         // ESTABLISHED.
                         case SYN_SENT:
                         {
-
+							// if received SYN, send ACK and move to SYN-RECEIVED
+							if (IS_SYN(flags_rem) && !IS_ACK(flags_rem)) {
+								// Extracts the initailized Sequence number from the TCPState.
+								unsigned int ack_num = cs.state.GetLastSent();
+								unsigned int win_size = cs.state.GetRwnd();
+								unsigned int seq_num = ack_rem+1;
+								unsigned char flags_src = 0;
+								SET_ACK(flags_src);
+								Packet p;
+								
+								// create and send packet
+								CreatePacket(&p, c, flags, seq_num, ack_num, win_size);
+								MinetSend(mux, p);
+								
+								// Set state to SYN_RECEIVED
+								(*cs).SetState(SYN_RCVD);
+							}
+							
+							// if received SYN+ACK, send ACK and move to established
+							else if (IS_SYN(flags_rem) && IS_ACK(flags_rem)) {
+								// Extracts the initailized Sequence number from the TCPState.
+								unsigned int ack_num = cs.state.GetLastSent();
+								unsigned int win_size = cs.state.GetRwnd();
+								unsigned int seq_num = ack_rem+1;
+								unsigned char flags_src = 0;
+								SET_ACK(flags_src);
+								Packet p;
+								
+								// create and send packet
+								CreatePacket(&p, c, flags, seq_num, ack_num, win_size);
+								MinetSend(mux, p);
+								
+								// Set state to ESTABLISHED
+								(*cs).SetState(ESTABLISHED);
+							}
+							
+							// else, something unexpected happened
+							else {
+								cout << "In SYN_SENT, received something besides SYN or SYN+ACK\n";
+							}
                         }
                         break;
 						 
