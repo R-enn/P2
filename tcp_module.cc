@@ -280,8 +280,8 @@ int main(int argc, char * argv[]) {
 							Packet reply;
 
                             // Extracts the initailized Sequence number from the TCPState.
-                            unsigned int ack_num = cs.state.GetLastSent();
-                            unsigned int win_size = cs.state.GetRwnd();
+                            unsigned int ack_num = (*cs).state.GetLastSent();
+                            unsigned int win_size = (*cs).state.GetRwnd();
                             unsigned int seq_num = ack_rem+1;
 							
 							// Sets our flags. We want to send a SYN and ACK.
@@ -333,37 +333,37 @@ int main(int argc, char * argv[]) {
 							// if received SYN, send ACK and move to SYN-RECEIVED
 							if (IS_SYN(flags_rem) && !IS_ACK(flags_rem)) {
 								// Extracts the initailized Sequence number from the TCPState.
-								unsigned int ack_num = cs.state.GetLastSent();
-								unsigned int win_size = cs.state.GetRwnd();
+								unsigned int ack_num = (*cs).state.GetLastSent();
+								unsigned int win_size = (*cs).state.GetRwnd();
 								unsigned int seq_num = ack_rem+1;
 								unsigned char flags_src = 0;
 								SET_ACK(flags_src);
 								Packet p;
 								
 								// create and send packet
-								CreatePacket(&p, c, flags, seq_num, ack_num, win_size);
+								CreatePacket(p, c, flags_src, seq_num, ack_num, win_size, cout);
 								MinetSend(mux, p);
 								
 								// Set state to SYN_RECEIVED
-								(*cs).SetState(SYN_RCVD);
+								(*cs).state.SetState(SYN_RCVD);
 							}
 							
 							// if received SYN+ACK, send ACK and move to established
 							else if (IS_SYN(flags_rem) && IS_ACK(flags_rem)) {
 								// Extracts the initailized Sequence number from the TCPState.
-								unsigned int ack_num = cs.state.GetLastSent();
-								unsigned int win_size = cs.state.GetRwnd();
+								unsigned int ack_num = (*cs).state.GetLastSent();
+								unsigned int win_size = (*cs).state.GetRwnd();
 								unsigned int seq_num = ack_rem+1;
 								unsigned char flags_src = 0;
 								SET_ACK(flags_src);
 								Packet p;
 								
 								// create and send packet
-								CreatePacket(&p, c, flags, seq_num, ack_num, win_size);
+								CreatePacket(p, c, flags_src, seq_num, ack_num, win_size, cout);
 								MinetSend(mux, p);
 								
 								// Set state to ESTABLISHED
-								(*cs).SetState(ESTABLISHED);
+								(*cs).state.SetState(ESTABLISHED);
 							}
 							
 							// else, something unexpected happened
@@ -377,7 +377,12 @@ int main(int argc, char * argv[]) {
 						// With Established, we extract the the data and send it up to our application. At this point
 						// the packet SHOULD have application data.
 					    case ESTABLISHED: {
+							 // If we receive a FIN, send back ack and move to CLOSE-WAIT
+							 if (IS_FIN(flags_rem)) {
+								
+							 }
 							 
+							 // else we can also initiate the close from here 
 						}
 						break;
 						
