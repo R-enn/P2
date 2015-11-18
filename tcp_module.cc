@@ -352,6 +352,8 @@ int main(int argc, char * argv[]) {
                                 // no data and a zero error code.
                                 SockRequestResponse reply;
                                 reply.type = WRITE;
+                                reply.connection = c;
+                                reply.bytes = 0;
                                 reply.error = EOK;
                                 MinetSend(sock, reply);
                             }
@@ -362,6 +364,7 @@ int main(int argc, char * argv[]) {
                                 break;
                             }
                         }
+                        break;
 
                         // Client Only.
                         // In the SYN_SENT state, the client is waiting for a SYN+ACK from the server. We validate the ACK
