@@ -221,14 +221,14 @@ int main(int argc, char * argv[]) {
                     // Only remove it if we didnt' add it recently.
 					ConnectionList<TCPState>::iterator cs = clist.FindMatching(c);
 					if ( cs != clist.end() ) {
-                        if ( (*cs).state.GetState() != LISTEN ) {
-						    clist.erase(cs);
-                            clist.push_back(m);
-                        }
+				        clist.erase(cs);
 					}
-                    else {
-                        clist.push_back(m);
-                    }
+
+                    // Adds our new connection mapping.
+                    clist.push_back(m);
+
+                    // DEBUG:
+                    cout << m.Print(cout);
 				}
 				
                 //  .__________.
@@ -259,7 +259,7 @@ int main(int argc, char * argv[]) {
 
                 // FLAG is not part of the three-way-handshake.
                 else {
-                    cout << "\n\nNot a SYN. Going to handle in our ConnectionList thing.\n";
+                    cout << "\n\nNot a SYN. Handled in our cases.\n";
                 }
 				
 				// Searches through our ConnectionList mapping to find the associated TCPState to handle.
@@ -284,10 +284,11 @@ int main(int argc, char * argv[]) {
 							// We need to reply with a packet with a SYN and ACK flag set.
 							Packet reply;
 
-                            // Extracts the initailized Sequence number from the TCPState.
-                            unsigned int ack_num = (*cs).state.GetLastSent();
+                            // Extracts the initailized sequence number from the TCPState and sets up
+                            // the window size and ack number to return.
+                            unsigned int seq_num = (*cs).state.GetLastSent();
                             unsigned int win_size = (*cs).state.GetRwnd();
-                            unsigned int seq_num = ack_rem+1;
+                            unsigned int ack_num = seqnum_rem+1;
 							
 							// Sets our flags. We want to send a SYN and ACK.
 							unsigned char flags_src = 0;
@@ -295,7 +296,7 @@ int main(int argc, char * argv[]) {
 							SET_SYN(flags_src);
 							
 							// Creates a new packet. Using the following custom function:
-							// CreatePacket( packet, connection, flags, ack_num, seq_num, win_size);
+							// CreatePacket( packet, connection, flags, ack_num, seq_num, win_size, cout);
 							CreatePacket( reply, c, flags_src, seq_num, ack_num, win_size, cout );
 
                             // DEBUG:
@@ -308,8 +309,8 @@ int main(int argc, char * argv[]) {
 							// Update TCPState. We transition to SYN_RCVD on the Server end. We also note our init SeqNumber, the
 							// ack number, etc etc.
 							(*cs).state.SetState(SYN_RCVD);
-							(*cs).state.SetLastAcked(ack_num); // This might just be one. I don't know.
                             (*cs).state.SetLastSent(seq_num);
+                            (*cs).state.SetLastRecvd(seqnum_rem);
 							
 							// DEBUG: Prints out TCPSTATE.
 							cout << "\n\nHandled LISTEN state on server. Updated State is now:\n";
@@ -334,23 +335,32 @@ int main(int argc, char * argv[]) {
                             cout << "\n\nChecking Last Sequence and Recieved ACK number.\n";
                             cout << "Sequence Number: " << seqnum_last << " | Recieved ACK: " << ack_rem << " \n";
                             
+                            // The recieved ACK should be equal to TCPState.GetLastSent()+1. If it isn't, we drop this
+                            // packet. If it is, then we can safely transition into the ESTABLISHED state and inform the
+                            // SOCK module that we have fully bound the connection.
                             if ( seqnum_last+1 == ack_rem ) {
+
+                                // DEBUG:
                                 cout << "\n\nSEQ+1 and ACK MATCHES.\n";
-                            }
-                            else if ( seqnum_last == ack_rem ) {
-                                cout << "\n\nSEQ and ACK Matches.\n";
-                            }
-                            else {
-                                cout << "\n\nValidation error. ACK and Sequence numbers aren't compatible.\n";
+                                
+                                // Updates our TCPState.
+                                (*cs).state.SetState(ESTABLISHED);
+                                (*cs).state.SetLastRecvd(seqnum_rem);
+                                (*cs).state.SetLastAcked(seqnum_last);
+
+                                // Notify server that the conneciton has been established. This a WRITE request with
+                                // no data and a zero error code.
+                                SockRequestResponse reply;
+                                reply.type = WRITE;
+                                reply.error = EOK;
+                                MinetSend(sock, reply);
                             }
 
-                            // Notify server that the connection has been established.
-                            /*
-                            SockRequestResponse reply;
-                            reply.type = WRITE;
-                            reply.error = EOK;
-                            MinetSent(sock,reply);
-                            */
+                            // Drop the packet. The ACK number is not correct.
+                            else {
+                                cout << "\n\nValidation error. ACK and Sequence numbers aren't compatible.\n";
+                                break;
+                            }
                         }
 
                         // Client Only.
@@ -362,9 +372,9 @@ int main(int argc, char * argv[]) {
 							// if received SYN, send ACK and move to SYN-RECEIVED
 							if (IS_SYN(flags_rem) && !IS_ACK(flags_rem)) {
 								// Extracts the initailized Sequence number from the TCPState.
-								unsigned int ack_num = (*cs).state.GetLastSent();
+								unsigned int seq_num = (*cs).state.GetLastSent();
 								unsigned int win_size = (*cs).state.GetRwnd();
-								unsigned int seq_num = ack_rem+1;
+								unsigned int ack_num = seqnum_rem+1;
 								unsigned char flags_src = 0;
 								SET_ACK(flags_src);
 								Packet p;
@@ -405,7 +415,14 @@ int main(int argc, char * argv[]) {
                         // ESTABLISH. Both Clien and Server. This is where we extract application data. Main handle.
 						// With Established, we extract the the data and send it up to our application. At this point
 						// the packet SHOULD have application data.
-					    case ESTABLISHED: {
+					    case ESTABLISHED: 
+                        {
+
+                            // DEBUG:
+                            cout << "\n\nESTABLISHED CASE.\n";
+                            cout << "Not implemented at the moment.\n";
+
+
 							 // If we receive a FIN, send back ack and move to CLOSE-WAIT
 							 if (IS_FIN(flags_rem)) {
 								
